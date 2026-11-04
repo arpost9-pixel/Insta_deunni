@@ -1,0 +1,20 @@
+{
+  "title": "임신 기록 릴스 샘플 (레퍼런스 구조 재현)",
+  "style": "vlog",
+  "output": "sample_reel.mp4",
+  "hook": { "top": "아무 생각 없이 해본 임테기였는데", "main": "두 줄이라고?!", "start": 0, "end": 3.2 },
+  "bgm": null,
+  "clips": [
+    { "src": "placeholders/01.jpg", "dur": 1.6, "shot": "임테기 클로즈업\n(손에 들고 흔들기)", "caption": "저 됐어요" },
+    { "src": "placeholders/02.jpg", "dur": 1.6, "shot": "임테기 정지 컷", "caption": "임신 됐어요.." },
+    { "src": "placeholders/03.jpg", "dur": 2.4, "shot": "평소 일상 컷\n(카페·외식 등)", "caption": "근데 그때는 전혀 몰랐어요" },
+    { "src": "placeholders/04.jpg", "dur": 2.4, "shot": "평소 일상 컷 2", "caption": "평소랑 똑같이 지냈는데" },
+    { "src": "placeholders/05.jpg", "dur": 2.2, "shot": "약국·편의점에서\n임테기 사는 장면", "caption": "뭔가 느낌이 이상해서 임테기를 사봤는데," },
+    { "src": "placeholders/06.jpg", "dur": 1.6, "shot": "임테기 결과 클로즈업", "emphasis": "두줄?!?!" },
+    { "src": "placeholders/07.jpg", "dur": 2.4, "shot": "산부인과 외관·복도", "caption": "병원 가보니 벌써 5주 차래요" },
+    { "src": "placeholders/08.jpg", "dur": 2.4, "shot": "병원 내부 걷는 POV", "caption": "기쁘면서도 걱정이 많이 됐어요" },
+    { "src": "placeholders/09.jpg", "dur": 2.6, "shot": "초음파 사진\n(손에 들고)", "caption": "다행히 지금은 잘 크고 있대요 🤍" },
+    { "src": "placeholders/10.jpg", "dur": 2.4, "shot": "초음파 사진 클로즈업", "caption": "태명아, 언제부터 거기 있었니?" },
+    { "src": "placeholders/11.jpg", "dur": 3.0, "shot": "초음파 사진 엔딩 컷", "ending": "잘 지내보자" }
+  ]
+}
