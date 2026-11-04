@@ -44,3 +44,5 @@ python3 make_reel.py projects/sample/project.json --preview  # 빠른 확인
 - 결과물: `projects/surprise/surprise_reel.mp4` (28초)
 - `media/01_test.jpg` 실사진 적용 / `placeholders/03~07, 10, 11.jpg` 는 남편 리액션 촬영본으로 교체 필요 (영상 파일이면 `src` 확장자만 `.mp4`로 변경)
 - 자막에는 이모지 미사용(렌더링 폰트 미지원) → 이모지는 인스타 본문 캡션에 사용
+- (업데이트) 남편 리액션 원본(`media/husband_raw.MOV`, 116초 가로 영상)을 세로 크롭해 적용. 원본은 용량(167MB) 문제로 git 제외 — 구글 드라이브 'Raw' 폴더 보관본 사용
+- 컷별 `crop_x`(가로 영상 세로 크롭 중심), `volume`/`mute`(원본 음성) 옵션 추가, 최종 음량 -16 LUFS 정규화

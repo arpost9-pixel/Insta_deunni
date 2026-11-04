@@ -115,22 +115,35 @@ def render_clip(clip, base, out, preview):
         sys.exit(f"[오류] 소스 파일 없음: {src}")
     dur = float(clip["dur"])
     is_img = os.path.splitext(src)[1].lower() in IMG_EXT
-    fill = (f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1")
     if is_img:
         frames = int(round(dur * FPS))
         zoom = clip.get("zoom", 0.06)  # 사진은 은은한 줌인(켄번즈)
         vf = (f"scale={W*2}:{H*2}:force_original_aspect_ratio=increase,crop={W*2}:{H*2},"
               f"zoompan=z='1+{zoom}*on/{max(frames,1)}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
               f":d={frames}:s={W}x{H}:fps={FPS},setsar=1")
-        inp = ["-loop", "1", "-framerate", str(FPS), "-t", f"{dur}", "-i", src]
+        inp = ["-loop", "1", "-framerate", str(FPS), "-t", f"{dur}", "-i", src,
+               "-f", "lavfi", "-t", f"{dur}", "-i", "anullsrc=r=48000:cl=stereo"]
+        af = "anull"
     else:
         speed = float(clip.get("speed", 1.0))
-        vf = fill + (f",setpts=PTS/{speed}" if speed != 1.0 else "") + f",fps={FPS}"
-        inp = ["-ss", str(clip.get("start", 0)), "-t", f"{dur * speed}", "-i", src]
+        # 가로 영상 → 세로 크롭. crop_x / crop_y = 프레임 내 중심 위치(0~1), vzoom = 추가 확대 배율
+        cx, cy, vz = clip.get("crop_x", 0.5), clip.get("crop_y", 0.5), clip.get("vzoom", 1.0)
+        vf = (f"scale='if(gt(a,{W}/{H}),-2,{int(W*vz)})':'if(gt(a,{W}/{H}),{int(H*vz)},-2)',"
+              f"crop={W}:{H}:'max(0,min(iw-{W},iw*{cx}-{W//2}))':'max(0,min(ih-{H},ih*{cy}-{H//2}))',setsar=1")
+        vf += (f",setpts=PTS/{speed}" if speed != 1.0 else "") + f",fps={FPS}"
+        inp = ["-ss", str(clip.get("start", 0)), "-t", f"{dur * speed}", "-i", src,
+               "-f", "lavfi", "-t", f"{dur}", "-i", "anullsrc=r=48000:cl=stereo"]
+        vol = 0 if clip.get("mute") else clip.get("volume", 1.0)
+        af = f"volume={vol}" + (f",atempo={speed}" if speed != 1.0 else "")
     vf += ",format=yuv420p"
-    cmd = ["ffmpeg", "-v", "error", "-y", *inp, "-vf", vf, "-t", f"{dur}", "-an",
-           "-c:v", "libx264", "-preset", "ultrafast" if preview else "medium", "-crf", "18",
-           "-r", str(FPS), out]
+    has_audio = (not is_img) and subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", src],
+        capture_output=True, text=True).stdout.strip() != ""
+    amap = "0:a" if has_audio else "1:a"
+    fc = f"[0:v]{vf}[v];[{amap}]{af if has_audio else 'anull'},aresample=48000,aformat=channel_layouts=stereo,apad[a]"
+    cmd = ["ffmpeg", "-v", "error", "-y", *inp, "-filter_complex", fc, "-map", "[v]", "-map", "[a]",
+           "-t", f"{dur}", "-c:v", "libx264", "-preset", "ultrafast" if preview else "medium", "-crf", "18",
+           "-r", str(FPS), "-c:a", "aac", "-b:a", "192k", "-ar", "48000", out]
     subprocess.run(cmd, check=True)
 
 
@@ -171,19 +184,20 @@ def main():
 
         total = t
         bgm = project.get("bgm")
-        audio_in, amap = [], []
         if bgm:
             bgm_path = os.path.join(base, bgm["src"])
-            vol = bgm.get("volume", 0.8)
+            vol = bgm.get("volume", 0.5)
             audio_in = ["-ss", str(bgm.get("start", 0)), "-i", bgm_path]
-            af = f"volume={vol},afade=t=in:d=0.3,afade=t=out:st={max(total-1.5,0)}:d=1.5,apad"
-            amap = ["-filter:a", af, "-map", "0:v", "-map", "1:a", "-c:a", "aac", "-b:a", "192k"]
+            fa = (f"[1:a]volume={vol},afade=t=in:d=0.3,afade=t=out:st={max(total-1.5,0)}:d=1.5,apad[b];"
+                  f"[0:a][b]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-16:TP=-1.5[a]")
         else:
-            audio_in = ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
-            amap = ["-map", "0:v", "-map", "1:a", "-c:a", "aac"]
+            audio_in = []
+            fa = "[0:a]loudnorm=I=-16:TP=-1.5[a]"
+        amap = ["-map", "[v]", "-map", "[a]", "-c:a", "aac", "-b:a", "192k", "-ar", "48000"]
 
-        vf = f"ass='{ass}':fontsdir='{FONT_DIR}'"
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", joined, *audio_in, "-vf", vf, *amap,
+        fa = f"[0:v]ass='{ass}':fontsdir='{FONT_DIR}'[v];" + fa
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", joined, *audio_in,
+                        "-filter_complex", fa, *amap,
                         "-c:v", "libx264", "-preset", "veryfast" if args.preview else "slow",
                         "-crf", "26" if args.preview else "18", "-pix_fmt", "yuv420p",
                         "-t", f"{total}", "-movflags", "+faststart", out], check=True)
