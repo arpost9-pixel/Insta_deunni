@@ -14,8 +14,8 @@ for i, c in enumerate(P["clips"]):
     for y in range(1920):
         t = y / 1919
         d.line([(0, y), (1080, y)], fill=tuple(int(a[k]*(1-t)+b[k]*t) for k in range(3)))
-    d.rounded_rectangle([90, 760, 990, 1160], 40, outline=(120,110,100), width=4)
-    d.text((540, 860), f"CUT {i+1:02d}", font=small, fill=(120,110,100), anchor="mm")
-    d.multiline_text((540, 980), c.get("shot", ""), font=font, fill=(80,70,60), anchor="mm", align="center", spacing=14)
+    d.rounded_rectangle([90, 560, 990, 900], 40, outline=(120,110,100), width=4)
+    d.text((540, 640), f"CUT {os.path.splitext(os.path.basename(c['src']))[0]}", font=small, fill=(120,110,100), anchor="mm")
+    d.multiline_text((540, 760), c.get("shot", ""), font=font, fill=(80,70,60), anchor="mm", align="center", spacing=14)
     path = os.path.join(base, c["src"]); os.makedirs(os.path.dirname(path), exist_ok=True); im.save(path, quality=92)
 print("ok")

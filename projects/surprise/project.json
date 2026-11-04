@@ -1,0 +1,21 @@
+{
+  "title": "임테기 두 줄 남편 서프라이즈",
+  "style": "vlog",
+  "output": "surprise_reel.mp4",
+  "hook": { "top": "임테기 두 줄 보자마자", "main": "남편한테 서프라이즈 했더니?!", "start": 0, "end": 3.6 },
+  "bgm": null,
+  "clips": [
+    { "src": "media/01_test.jpg", "dur": 1.8, "zoom": 0.05, "caption": "두 줄 확인하고" },
+    { "src": "media/01_test.jpg", "dur": 2.4, "zoom": 0.08, "caption": "남편 퇴근 시간만 기다렸어요" },
+    { "src": "placeholders/03.jpg", "dur": 2.6, "shot": "현관 들어오는 남편\n(통화 중)", "caption": "아무것도 모르고 전화받으면서 들어오는 남편" },
+    { "src": "placeholders/04.jpg", "dur": 1.4, "shot": "임테기 보는 순간\n(얼굴 클로즈업)", "emphasis": "...?!" },
+    { "src": "placeholders/05.jpg", "dur": 2.2, "shot": "굳어버린 남편", "caption": "생각지도 못해서 그대로 굳어버림" },
+    { "src": "placeholders/06.jpg", "dur": 1.4, "shot": "남편 리액션\n(임테기 들고 확인)", "emphasis": "진짜로?" },
+    { "src": "placeholders/07.jpg", "dur": 2.6, "shot": "남편 리액션 2\n(계속 묻는 장면)", "caption": "진짜로? 만 서른마흔다섯 번 물어봄 ㅋㅋㅋ" },
+    { "src": "media/01_test.jpg", "dur": 2.8, "zoom": 0.04, "caption": "임신이 맘처럼 쉽지 않다는 얘기를 많이 들어서" },
+    { "src": "media/01_test.jpg", "dur": 2.6, "zoom": 0.04, "caption": "실망하지 않으려고 기대 안 하고 있었는데" },
+    { "src": "placeholders/10.jpg", "dur": 2.6, "shot": "부부 투샷\n(임테기 함께 들고)", "caption": "엄마 아빠 오래 기다리게 하지 않고" },
+    { "src": "placeholders/11.jpg", "dur": 2.6, "shot": "부부 투샷 2\n(포옹·미소)", "caption": "금방 찾아와준 우리 아기" },
+    { "src": "media/01_test.jpg", "dur": 3.0, "zoom": 0.07, "ending": "와줘서 고마워" }
+  ]
+}

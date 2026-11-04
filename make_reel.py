@@ -30,7 +30,7 @@ IMG_EXT = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".bmp"}
 # ---------------------------------------------------------------------------
 PRESETS = {
     "vlog": {
-        "caption": "Pretendard Medium,44,&H00FFFFFF,&H00000000,&H64000000,0,1,1.2,2.5,2,90,90,560",
+        "caption": "Pretendard SemiBold,46,&H00FFFFFF,&H50000000,&H78000000,0,1,2.2,2,2,90,90,560",
         "caption_box": False,
     },
     "cute": {
@@ -41,7 +41,7 @@ PRESETS = {
 COMMON_STYLES = [
     # name, font, size, primary, outline, back, bold, borderstyle, outline, shadow, align, mL, mR, mV
     "HookTop,Pretendard Bold,50,&H00000000,&H0000E5FF,&H0000E5FF,-1,3,10,0,8,90,90,250",
-    "HookMain,Pretendard Bold,74,&H00000000,&H00FFFFFF,&H00000000,-1,1,0,0,8,90,90,330",
+    "HookMain,Pretendard Bold,72,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,3,14,0,8,90,90,330",
     "Emphasis,Pretendard Bold,120,&H00FFFFFF,&H00000000,&H64000000,-1,1,7,3,5,60,60,0",
     "Ending,Pretendard Medium,76,&H00FFFFFF,&H00000000,&H78000000,0,1,0,4,8,60,60,330",
 ]

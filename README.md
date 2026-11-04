@@ -39,3 +39,8 @@ python3 make_reel.py projects/sample/project.json --preview  # 빠른 확인
 `projects/sample/sample_reel.mp4` — 촬영 가이드 카드(플레이스홀더)로 만든 24.6초 데모. 각 카드의 컷 설명대로 촬영해 같은 파일명으로 교체하면 됩니다.
 
 폰트: Pretendard (SIL OFL 1.1)
+
+## 4. 프로젝트: 임테기 두 줄 남편 서프라이즈 (`projects/surprise`)
+- 결과물: `projects/surprise/surprise_reel.mp4` (28초)
+- `media/01_test.jpg` 실사진 적용 / `placeholders/03~07, 10, 11.jpg` 는 남편 리액션 촬영본으로 교체 필요 (영상 파일이면 `src` 확장자만 `.mp4`로 변경)
+- 자막에는 이모지 미사용(렌더링 폰트 미지원) → 이모지는 인스타 본문 캡션에 사용
