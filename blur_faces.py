@@ -158,6 +158,25 @@ def blur_face(frame, d):
     frame[y0:y1, x0:x1] = (blurred * mask + roi * (1 - mask)).astype(np.uint8)
 
 
+def blur_rect(frame, box):
+    """수동 지정 영역(표지·번호 등) 사각형 블러, 가장자리만 살짝 부드럽게."""
+    H, W = frame.shape[:2]
+    x, y, w, h = [int(v) for v in box]
+    x0, y0, x1, y1 = max(0, x), max(0, y), min(W, x + w), min(H, y + h)
+    if x1 - x0 < 4 or y1 - y0 < 4:
+        return
+    roi = frame[y0:y1, x0:x1]
+    small = cv2.resize(roi, (max(1, (x1 - x0) // 12), max(1, (y1 - y0) // 12)), interpolation=cv2.INTER_AREA)
+    pix = cv2.resize(small, (x1 - x0, y1 - y0), interpolation=cv2.INTER_NEAREST)
+    k = max(9, (min(x1 - x0, y1 - y0) // 2) | 1)
+    blurred = cv2.GaussianBlur(cv2.GaussianBlur(pix, (k, k), 0), (k, k), 0)
+    mask = np.zeros((y1 - y0, x1 - x0), np.uint8)
+    e = max(2, min(x1 - x0, y1 - y0) // 8)
+    cv2.rectangle(mask, (e, e), (x1 - x0 - e, y1 - y0 - e), 255, -1)
+    mask = cv2.GaussianBlur(mask, (2 * e + 1, 2 * e + 1), 0)[..., None] / 255.0
+    frame[y0:y1, x0:x1] = (blurred * mask + roi * (1 - mask)).astype(np.uint8)
+
+
 def blur_video(inp, output, model, manual=None, skip=None, cuts=None, score=0.5, cache=None):
     """skip: [(s,e)] 블러 제외 구간(초) / cuts: 컷 경계(초) 리스트 / manual: 수동 지정 박스."""
     W, H, fps = probe(inp)
@@ -180,8 +199,7 @@ def blur_video(inp, output, model, manual=None, skip=None, cuts=None, score=0.5,
                 blur_face(f, d)
         for m in manual or []:
             if m["start"] <= i / fps <= m["end"]:
-                x, y, w, h = m["box"]
-                blur_face(f, np.array([x, y, w / SCALE_W, h / SCALE_H] + [x + w / 2, y + h / 2] * 5))
+                blur_rect(f, m["box"])
         enc.stdin.write(f.tobytes())
     enc.stdin.close()
     enc.wait()

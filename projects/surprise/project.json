@@ -11,7 +11,20 @@
   "bgm": null,
   "blur_faces": {
     "model": "assets/models/yunet.onnx",
-    "score": 0.5
+    "score": 0.5,
+    "manual": [
+      {
+        "start": 3.59,
+        "end": 6.59,
+        "box": [
+          660,
+          375,
+          90,
+          110
+        ],
+        "note": "문 위 '23' 표지"
+      }
+    ]
   },
   "clips": [
     {
@@ -104,7 +117,7 @@
       "src": "media/01_test.jpg",
       "dur": 3.0,
       "zoom": 0.07,
-      "ending": "와줘서 고마워"
+      "ending": "우리 집에 온 것을 환영해"
     }
   ]
 }
