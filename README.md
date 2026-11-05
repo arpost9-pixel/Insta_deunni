@@ -46,3 +46,9 @@ python3 make_reel.py projects/sample/project.json --preview  # 빠른 확인
 - 자막에는 이모지 미사용(렌더링 폰트 미지원) → 이모지는 인스타 본문 캡션에 사용
 - (업데이트) 남편 리액션 원본(`media/husband_raw.MOV`, 116초 가로 영상)을 세로 크롭해 적용. 원본은 용량(167MB) 문제로 git 제외 — 구글 드라이브 'Raw' 폴더 보관본 사용
 - 컷별 `crop_x`(가로 영상 세로 크롭 중심), `volume`/`mute`(원본 음성) 옵션 추가, 최종 음량 -16 LUFS 정규화
+
+## 5. 얼굴 블러 (`blur_faces.py`)
+- project.json 에 `"blur_faces": {"model": "assets/models/yunet.onnx", "score": 0.5}` 추가 시 자막 입히기 **전** 단계에서 얼굴 자동 블러(모자이크+가우시안)
+- 사진 컷은 자동 제외(곰 캔들 오검출 방지), 컷 단위 제외는 `"no_blur": true`
+- 놓친 구간 수동 지정: `"manual": [{"start": 12.0, "end": 13.5, "box": [x, y, w, h]}]` (1080x1920 기준, 블러 전 합본 타임라인 기준 초)
+- 필요 패키지: `pip install opencv-python-headless numpy` / 모델: OpenCV Zoo YuNet (MIT)

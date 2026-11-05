@@ -179,6 +179,16 @@ def main():
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", listf,
                         "-c", "copy", joined], check=True)
 
+        bf = project.get("blur_faces")
+        if bf:  # 자막 입히기 전에 얼굴 블러 (자막이 블러에 묻히지 않도록)
+            from blur_faces import blur_video
+            skip = [(a, b) for (a, b, c) in timeline
+                    if os.path.splitext(c["src"])[1].lower() in IMG_EXT or c.get("no_blur")]
+            blurred = os.path.join(tmp, "blurred.mp4")
+            blur_video(joined, blurred, os.path.join(ROOT, bf.get("model", "assets/models/yunet.onnx")),
+                       manual=bf.get("manual"), skip=skip, score=bf.get("score", 0.5))
+            joined = blurred
+
         ass = os.path.join(tmp, "subs.ass")
         build_ass(project, timeline, ass)
 
