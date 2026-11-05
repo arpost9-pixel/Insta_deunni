@@ -147,10 +147,10 @@ def blur_face(frame, d):
     if x1 - x0 < 6 or y1 - y0 < 6:
         return
     roi = frame[y0:y1, x0:x1]
-    small = cv2.resize(roi, (max(1, (x1 - x0) // 14), max(1, (y1 - y0) // 14)), interpolation=cv2.INTER_AREA)
+    small = cv2.resize(roi, (max(1, (x1 - x0) // 22), max(1, (y1 - y0) // 22)), interpolation=cv2.INTER_AREA)
     pix = cv2.resize(small, (x1 - x0, y1 - y0), interpolation=cv2.INTER_NEAREST)
-    k = max(15, ((x1 - x0) // 5) | 1)
-    blurred = cv2.GaussianBlur(pix, (k, k), 0)
+    k = max(15, ((x1 - x0) // 3) | 1)
+    blurred = cv2.GaussianBlur(cv2.GaussianBlur(pix, (k, k), 0), (k, k), 0)
     mask = np.zeros((y1 - y0, x1 - x0), np.uint8)
     cv2.ellipse(mask, (int(cx - x0), int(cy - y0)), (int(ax), int(ay)), ang, 0, 360, 255, -1)
     feather = max(5, int(min(ax, ay) * 0.12) | 1)
