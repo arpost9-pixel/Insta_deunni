@@ -62,7 +62,7 @@ def detect_all(path, model, W, H, score, cache):
     return dets
 
 
-def build_tracks(dets, cut_frames, n):
+def build_tracks(dets, cut_frames, n, win=1):
     """dets[i] = [[x,y,w,h, 10 landmark coords, score], ...] → 프레임별 박스 리스트."""
     bounds = sorted(set([0] + cut_frames + [n]))
     seg_of = np.zeros(n, int)
@@ -111,19 +111,19 @@ def build_tracks(dets, cut_frames, n):
             arr[k] = arr[first]
         for k in range(last + 1, min(b, post + 1)):
             arr[k] = arr[last]
-        # 위치 스무딩 (3프레임 이동평균)
+        # 위치 스무딩 (±win 프레임 가중 이동평균, 이모지는 넓게 → 떨림 방지)
         keys = sorted(arr)
         sm = {}
         for j, k in enumerate(keys):
-            win = [arr[keys[m]] for m in range(max(0, j - 1), min(len(keys), j + 2)) if abs(keys[m] - k) <= 1]
-            sm[k] = np.mean(win, axis=0)
+            idx = [m for m in range(max(0, j - win), min(len(keys), j + win + 1)) if abs(keys[m] - k) <= win]
+            wts = np.array([win + 1 - abs(keys[m] - k) for m in idx], float)
+            sm[k] = np.average([arr[keys[m]] for m in idx], axis=0, weights=wts)
         for k, v in sm.items():
             out[k].append(v)
     return out
 
 
-def blur_face(frame, d):
-    H, W = frame.shape[:2]
+def face_ellipse(d):
     x, y, w, h = d[:4]
     lm = d[4:14].reshape(5, 2)  # 오른눈, 왼눈, 코, 입 오른쪽, 입 왼쪽
     eyes = (lm[0] + lm[1]) / 2
@@ -142,6 +142,12 @@ def blur_face(frame, d):
         ay *= 1 + turn * 0.25
         cx -= facing * w * 0.25 * turn
         ang *= 1 - turn
+    return cx, cy, ax, ay, ang
+
+
+def blur_face(frame, d):
+    H, W = frame.shape[:2]
+    cx, cy, ax, ay, ang = face_ellipse(d)
     r = int(max(ax, ay)) + 4
     x0, y0, x1, y1 = int(max(0, cx - r)), int(max(0, cy - r)), int(min(W, cx + r)), int(min(H, cy + r))
     if x1 - x0 < 6 or y1 - y0 < 6:
@@ -156,6 +162,38 @@ def blur_face(frame, d):
     feather = max(5, int(min(ax, ay) * 0.12) | 1)
     mask = cv2.GaussianBlur(mask, (feather, feather), 0)[..., None] / 255.0
     frame[y0:y1, x0:x1] = (blurred * mask + roi * (1 - mask)).astype(np.uint8)
+
+
+_EMOJI = {}
+
+
+def overlay_emoji(frame, d, path, scale=1.12):
+    """얼굴 타원을 완전히 덮도록 이모지(RGBA PNG)를 얹는다."""
+    if path not in _EMOJI:
+        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        ys, xs = np.where(img[..., 3] > 10)          # 투명 여백 제거
+        _EMOJI[path] = img[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    em = _EMOJI[path]
+    H, W = frame.shape[:2]
+    cx, cy, ax, ay, ang = face_ellipse(d)
+    size = int(2 * max(ax, ay) * scale)
+    if size < 8:
+        return
+    eh, ew = em.shape[:2]
+    sw, sh = int(size * ew / max(eh, ew)), int(size * eh / max(eh, ew))
+    e = cv2.resize(em, (sw, sh), interpolation=cv2.INTER_LANCZOS4 if sw > ew else cv2.INTER_AREA)
+    pad = int(max(sw, sh) * 0.3)
+    e = cv2.copyMakeBorder(e, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=(0, 0, 0, 0))
+    M = cv2.getRotationMatrix2D((e.shape[1] / 2, e.shape[0] / 2), -ang, 1.0)
+    e = cv2.warpAffine(e, M, (e.shape[1], e.shape[0]), flags=cv2.INTER_LINEAR, borderValue=(0, 0, 0, 0))
+    x0, y0 = int(round(cx - e.shape[1] / 2)), int(round(cy - e.shape[0] / 2))
+    fx0, fy0, fx1, fy1 = max(0, x0), max(0, y0), min(W, x0 + e.shape[1]), min(H, y0 + e.shape[0])
+    if fx1 <= fx0 or fy1 <= fy0:
+        return
+    sub = e[fy0 - y0:fy1 - y0, fx0 - x0:fx1 - x0]
+    a = sub[..., 3:4].astype(np.float32) / 255.0
+    roi = frame[fy0:fy1, fx0:fx1]
+    frame[fy0:fy1, fx0:fx1] = (sub[..., :3] * a + roi * (1 - a)).astype(np.uint8)
 
 
 def blur_rect(frame, box):
@@ -177,7 +215,7 @@ def blur_rect(frame, box):
     frame[y0:y1, x0:x1] = (blurred * mask + roi * (1 - mask)).astype(np.uint8)
 
 
-def blur_video(inp, output, model, manual=None, skip=None, cuts=None, score=0.5, cache=None):
+def blur_video(inp, output, model, manual=None, skip=None, cuts=None, score=0.5, cache=None, emoji=None):
     """skip: [(s,e)] 블러 제외 구간(초) / cuts: 컷 경계(초) 리스트 / manual: 수동 지정 박스."""
     W, H, fps = probe(inp)
     dets = detect_all(inp, model, W, H, score, cache)
@@ -188,6 +226,7 @@ def blur_video(inp, output, model, manual=None, skip=None, cuts=None, score=0.5,
             dets[i] = []
     cut_frames = [int(round(c * fps)) for c in (cuts or [])]
     per_frame = build_tracks(dets, cut_frames, n)
+    emoji_frames = build_tracks(dets, cut_frames, n, win=4) if emoji else None
 
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{W}x{H}",
                             "-r", f"{fps}", "-i", "-", "-i", inp, "-map", "0:v", "-map", "1:a?",
@@ -197,6 +236,9 @@ def blur_video(inp, output, model, manual=None, skip=None, cuts=None, score=0.5,
         if i < n:
             for d in per_frame[i]:
                 blur_face(f, d)
+            if emoji:
+                for d in emoji_frames[i]:
+                    overlay_emoji(f, d, emoji)
         for m in manual or []:
             if m["start"] <= i / fps <= m["end"]:
                 blur_rect(f, m["box"])

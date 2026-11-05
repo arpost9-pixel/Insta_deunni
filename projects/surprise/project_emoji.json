@@ -1,0 +1,124 @@
+{
+  "title": "임테기 두 줄 남편 서프라이즈",
+  "style": "vlog",
+  "output": "surprise_reel_emoji.mp4",
+  "hook": {
+    "top": "임테기 두 줄 보자마자",
+    "main": "남편한테 서프라이즈 했더니?!",
+    "start": 0,
+    "end": 3.6
+  },
+  "bgm": null,
+  "blur_faces": {
+    "model": "assets/models/yunet.onnx",
+    "score": 0.5,
+    "manual": [
+      {
+        "start": 3.59,
+        "end": 6.59,
+        "box": [
+          660,
+          375,
+          90,
+          110
+        ],
+        "note": "문 위 '23' 표지"
+      }
+    ],
+    "emoji": "assets/emoji/apple_man.png"
+  },
+  "clips": [
+    {
+      "src": "media/01_test.jpg",
+      "dur": 1.6,
+      "zoom": 0.05,
+      "caption": "두 줄 확인하고"
+    },
+    {
+      "src": "media/01_test.jpg",
+      "dur": 2.0,
+      "zoom": 0.08,
+      "caption": "남편 퇴근 시간만 기다렸어요"
+    },
+    {
+      "src": "media/husband_raw.MOV",
+      "start": 33.5,
+      "dur": 3.0,
+      "speed": 1.5,
+      "crop_x": 0.55,
+      "volume": 0.6,
+      "caption": "아무것도 모르고 전화받으면서 들어오는 남편"
+    },
+    {
+      "src": "media/husband_raw.MOV",
+      "start": 42.0,
+      "dur": 2.6,
+      "speed": 2.3,
+      "crop_x": 0.45,
+      "volume": 0.6
+    },
+    {
+      "src": "media/husband_raw.MOV",
+      "start": 52.0,
+      "dur": 2.4,
+      "crop_x": 0.52,
+      "caption": "생각지도 못해서 그대로 굳어버림"
+    },
+    {
+      "src": "media/husband_raw.MOV",
+      "start": 54.4,
+      "dur": 2.3,
+      "crop_x": 0.5,
+      "emphasis": "진짜?"
+    },
+    {
+      "src": "media/husband_raw.MOV",
+      "start": 56.8,
+      "dur": 5.9,
+      "speed": 1.25,
+      "crop_x": 0.53,
+      "caption": "진짜로? 만 서른마흔다섯 번 물어봄 ㅋㅋㅋ"
+    },
+    {
+      "src": "media/husband_raw.MOV",
+      "start": 68.2,
+      "dur": 2.6,
+      "crop_x": 0.48,
+      "emphasis": "또 진짜로?"
+    },
+    {
+      "src": "media/husband_raw.MOV",
+      "start": 92.6,
+      "dur": 3.0,
+      "crop_x": 0.5,
+      "caption": "임신이 맘처럼 쉽지 않다는 얘기를 많이 들어서"
+    },
+    {
+      "src": "media/husband_raw.MOV",
+      "start": 96.0,
+      "dur": 3.0,
+      "crop_x": 0.5,
+      "caption": "실망하지 않으려고 기대 안 하고 있었는데"
+    },
+    {
+      "src": "media/husband_raw.MOV",
+      "start": 99.5,
+      "dur": 3.0,
+      "crop_x": 0.5,
+      "caption": "엄마 아빠 오래 기다리게 하지 않고"
+    },
+    {
+      "src": "media/husband_raw.MOV",
+      "start": 111.5,
+      "dur": 3.3,
+      "crop_x": 0.47,
+      "caption": "금방 찾아와준 우리 아기"
+    },
+    {
+      "src": "media/01_test.jpg",
+      "dur": 3.0,
+      "zoom": 0.07,
+      "ending": "우리 집에 온 것을 환영해"
+    }
+  ]
+}

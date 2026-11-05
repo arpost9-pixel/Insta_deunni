@@ -197,7 +197,8 @@ def main():
             blur_video(joined, blurred, os.path.join(ROOT, bf.get("model", "assets/models/yunet.onnx")),
                        manual=bf.get("manual"), skip=skip, score=bf.get("score", 0.5),
                        cuts=real_cuts,
-                       cache=os.path.join(base, ".face_cache.json"))
+                       cache=os.path.join(base, ".face_cache.json"),
+                       emoji=os.path.join(ROOT, bf["emoji"]) if bf.get("emoji") else None)
             joined = blurred
 
         ass = os.path.join(tmp, "subs.ass")
