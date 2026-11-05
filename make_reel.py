@@ -179,14 +179,25 @@ def main():
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", listf,
                         "-c", "copy", joined], check=True)
 
+        # 실제 프레임 수 기준 컷 경계 (반올림 오차로 1프레임 어긋나는 것 방지)
+        real_cuts, acc = [], 0
+        for p_ in parts[:-1]:
+            nf = int(subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
+                                     "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", p_],
+                                    capture_output=True, text=True).stdout.strip())
+            acc += nf
+            real_cuts.append(acc / FPS)
         bf = project.get("blur_faces")
         if bf:  # 자막 입히기 전에 얼굴 블러 (자막이 블러에 묻히지 않도록)
             from blur_faces import blur_video
-            skip = [(a, b) for (a, b, c) in timeline
+            rb = [0.0] + real_cuts + [1e9]
+            skip = [(rb[k] + 1e-6, rb[k + 1] - 1e-6) for k, (a, b, c) in enumerate(timeline)
                     if os.path.splitext(c["src"])[1].lower() in IMG_EXT or c.get("no_blur")]
             blurred = os.path.join(tmp, "blurred.mp4")
             blur_video(joined, blurred, os.path.join(ROOT, bf.get("model", "assets/models/yunet.onnx")),
-                       manual=bf.get("manual"), skip=skip, score=bf.get("score", 0.5))
+                       manual=bf.get("manual"), skip=skip, score=bf.get("score", 0.5),
+                       cuts=real_cuts,
+                       cache=os.path.join(base, ".face_cache.json"))
             joined = blurred
 
         ass = os.path.join(tmp, "subs.ass")
@@ -213,7 +224,10 @@ def main():
                         "-t", f"{total}", "-movflags", "+faststart", out], check=True)
         print(f"완료: {out}  ({total:.1f}s)")
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        if not os.environ.get("KEEP_TMP"):
+            shutil.rmtree(tmp, ignore_errors=True)
+        else:
+            print("tmp:", tmp)
 
 
 if __name__ == "__main__":

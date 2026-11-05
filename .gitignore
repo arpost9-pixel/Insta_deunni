@@ -4,3 +4,4 @@ __pycache__/
 *.MOV
 *.mov
 projects/*/media/*_raw.*
+.face_cache.json

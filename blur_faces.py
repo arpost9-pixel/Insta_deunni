@@ -1,25 +1,30 @@
 #!/usr/bin/env python3
-"""완성된 릴스에서 얼굴을 자동 인식해 블러 처리한다.
+"""완성 전 합본 영상에서 얼굴을 자동 인식해 얼굴 모양(타원)대로 블러 처리한다.
 
-사용법:
-    python blur_faces.py input.mp4 output.mp4 --model yunet.onnx [--manual manual.json]
+2-pass 방식
+  1) 전 프레임 얼굴 검출 (OpenCV YuNet) → 결과 캐시
+  2) 컷 단위로 검출을 트랙으로 연결
+     - 짧게 튀는 오검출 트랙 제거 (MIN_TRACK 프레임 미만 / 저신뢰)
+     - 트랙 내부 검출 누락 프레임은 선형 보간
+     - 트랙 시작/끝을 컷 경계 쪽으로 최대 EXTEND 프레임 연장 → 컷 전환 직전 블러 풀림 방지
+  3) 얼굴 랜드마크 기준 타원 마스크로 블러
 
-- 얼굴 검출: OpenCV YuNet (face_detection_yunet_2023mar.onnx)
-- 검출이 순간적으로 끊겨도 최대 HOLD 프레임 동안 직전 위치 유지 → 블러가 깜빡이지 않게
-- manual.json: 자동 검출이 놓치는 구간을 직접 지정
-    [{"start": 12.0, "end": 13.5, "box": [x, y, w, h]}]   (1080x1920 기준 픽셀)
+CLI: python blur_faces.py input.mp4 output.mp4 --model yunet.onnx [--cuts 3.6,6.6,...]
 필요: pip install opencv-python-headless numpy, ffmpeg
 """
 import argparse
 import json
+import os
 import subprocess
 
 import cv2
 import numpy as np
 
-HOLD = 20          # 검출 끊김 시 유지 프레임 수 (30fps 기준 0.4초)
-PAD = 0.6         # 얼굴 박스 확장 비율 (머리카락·턱선까지 덮도록)
-SMOOTH = 0.6       # 박스 위치 스무딩 (0=즉시 이동, 1=고정)
+MIN_TRACK = 12      # 이 프레임 수 미만으로 잡힌 트랙은 오검출로 간주
+MIN_PEAK = 0.80     # 트랙 내 최고 신뢰도가 이보다 낮으면 오검출로 간주
+EXTEND = 15         # 트랙 앞뒤 연장 프레임 (컷 경계는 넘지 않음)
+SCALE_W = 1.25      # 타원 가로 = 검출 박스 가로 × SCALE_W
+SCALE_H = 1.45      # 타원 세로 = 검출 박스 세로 × SCALE_H (이마·턱 포함)
 
 
 def probe(path):
@@ -30,94 +35,158 @@ def probe(path):
     return int(out[0]), int(out[1]), float(n) / float(d)
 
 
-def blur_region(frame, box):
-    H, W = frame.shape[:2]
-    x, y, w, h = box
-    cx, cy = x + w / 2, y + h / 2
-    w, h = w * (1 + PAD * 2), h * (1 + PAD * 2)
-    x0, y0 = int(max(0, cx - w / 2)), int(max(0, cy - h / 2))
-    x1, y1 = int(min(W, cx + w / 2)), int(min(H, cy + h / 2))
-    if x1 - x0 < 4 or y1 - y0 < 4:
-        return
-    roi = frame[y0:y1, x0:x1]
-    # 모자이크 + 가우시안 → 확실히 식별 불가하도록
-    small = cv2.resize(roi, (max(1, (x1 - x0) // 18), max(1, (y1 - y0) // 18)), interpolation=cv2.INTER_LINEAR)
-    pix = cv2.resize(small, (x1 - x0, y1 - y0), interpolation=cv2.INTER_NEAREST)
-    k = max(31, ((x1 - x0) // 3) | 1)
-    blurred = cv2.GaussianBlur(pix, (k, k), 0)
-    mask = np.zeros((y1 - y0, x1 - x0), np.uint8)
-    cv2.ellipse(mask, ((x1 - x0) // 2, (y1 - y0) // 2), ((x1 - x0) // 2, (y1 - y0) // 2), 0, 0, 360, 255, -1)
-    mask = cv2.GaussianBlur(mask, (21, 21), 0)[..., None] / 255.0
-    frame[y0:y1, x0:x1] = (blurred * mask + roi * (1 - mask)).astype(np.uint8)
-
-
-def blur_video(inp, output, model, manual=None, skip=None, score=0.5, log_path=None):
-    """skip: [(start, end), ...] 블러를 적용하지 않을 구간(사진 컷 등 오검출 방지)."""
-    class A: pass
-    args = A()
-    args.input, args.output, args.model, args.log = inp, output, model, log_path
-    W, H, fps = probe(args.input)
-    manual = manual or []
-    skip = skip or []
-    det = cv2.FaceDetectorYN.create(args.model, "", (W // 2, H // 2), score, 0.3, 50)
-
-    dec = subprocess.Popen(["ffmpeg", "-v", "error", "-i", args.input, "-f", "rawvideo", "-pix_fmt", "bgr24", "-"],
+def frames(path, W, H):
+    dec = subprocess.Popen(["ffmpeg", "-v", "error", "-i", path, "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"],
                            stdout=subprocess.PIPE)
-    enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{W}x{H}",
-                            "-r", f"{fps}", "-i", "-", "-i", args.input, "-map", "0:v", "-map", "1:a?",
-                            "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p",
-                            "-c:a", "copy", "-movflags", "+faststart", args.output], stdin=subprocess.PIPE)
-    tracks = []  # [box(np), missed]
-    log = []
-    i = 0
     size = W * H * 3
     while True:
         buf = dec.stdout.read(size)
         if len(buf) < size:
             break
-        frame = np.frombuffer(buf, np.uint8).reshape(H, W, 3).copy()
-        tsec = i / fps
-        if any(a <= tsec < b for a, b in skip):
-            tracks = []
-            log.append((round(tsec, 2), -1, 0))
-            enc.stdin.write(frame.tobytes())
-            i += 1
-            continue
-        small = cv2.resize(frame, (W // 2, H // 2))
-        _, faces = det.detect(small)
-        boxes = [] if faces is None else [f[:4] * 2 for f in faces]
+        yield np.frombuffer(buf, np.uint8).reshape(H, W, 3).copy()
+    dec.wait()
 
-        # 간단한 트래킹: 가장 가까운 기존 트랙에 매칭
-        for t in tracks:
-            t[1] += 1
-        for b in boxes:
-            c = b[:2] + b[2:] / 2
+
+def detect_all(path, model, W, H, score, cache):
+    if cache and os.path.exists(cache):
+        data = json.load(open(cache))
+        if data.get("src_size") == os.path.getsize(path):
+            return data["dets"]
+    det = cv2.FaceDetectorYN.create(model, "", (W // 2, H // 2), score, 0.3, 50)
+    dets = []
+    for f in frames(path, W, H):
+        _, faces = det.detect(cv2.resize(f, (W // 2, H // 2)))
+        dets.append([] if faces is None else [[float(v) * 2 for v in fc[:14]] + [float(fc[14])] for fc in faces])
+    if cache:
+        json.dump({"src_size": os.path.getsize(path), "dets": dets}, open(cache, "w"))
+    return dets
+
+
+def build_tracks(dets, cut_frames, n):
+    """dets[i] = [[x,y,w,h, 10 landmark coords, score], ...] → 프레임별 박스 리스트."""
+    bounds = sorted(set([0] + cut_frames + [n]))
+    seg_of = np.zeros(n, int)
+    for s, (a, b) in enumerate(zip(bounds, bounds[1:])):
+        seg_of[a:b] = s
+    tracks = []   # {"seg", "pts": {frame: det}}
+    active = []
+    for i in range(n):
+        if i in bounds:
+            active = []
+        for d in dets[i]:
+            c = np.array([d[0] + d[2] / 2, d[1] + d[3] / 2])
             best, bd = None, 1e9
-            for t in tracks:
-                d = np.linalg.norm((t[0][:2] + t[0][2:] / 2) - c)
-                if d < bd:
-                    best, bd = t, d
-            if best is not None and bd < max(b[2], b[3]) * 1.5:
-                best[0] = best[0] * SMOOTH + b * (1 - SMOOTH) if best[1] <= 1 else b
-                best[1] = 0
+            for t in active:
+                lf = max(t["pts"])
+                if i - lf > EXTEND * 2:
+                    continue
+                ld = t["pts"][lf]
+                dist = np.linalg.norm(np.array([ld[0] + ld[2] / 2, ld[1] + ld[3] / 2]) - c)
+                if dist < bd:
+                    best, bd = t, dist
+            if best is not None and bd < max(d[2], d[3]) * 1.2 and i not in best["pts"]:
+                best["pts"][i] = d
             else:
-                tracks.append([b.astype(float), 0])
-        tracks = [t for t in tracks if t[1] <= HOLD]
+                t = {"seg": int(seg_of[i]), "pts": {i: d}}
+                tracks.append(t)
+                active.append(t)
 
-        for t in tracks:
-            blur_region(frame, t[0])
-        for m in manual:
-            if m["start"] <= tsec <= m["end"]:
-                blur_region(frame, m["box"])
-        log.append((round(tsec, 2), len(boxes), len(tracks)))
-        enc.stdin.write(frame.tobytes())
-        i += 1
+    out = [[] for _ in range(n)]
+    for t in tracks:
+        ks = sorted(t["pts"])
+        if len(ks) < MIN_TRACK or max(t["pts"][k][-1] for k in ks) < MIN_PEAK:
+            continue  # 오검출 제거
+        a, b = bounds[t["seg"]], bounds[t["seg"] + 1]
+        arr = {k: np.array(t["pts"][k][:14]) for k in ks}
+        # 내부 누락 보간
+        for k0, k1 in zip(ks, ks[1:]):
+            for k in range(k0 + 1, k1):
+                r = (k - k0) / (k1 - k0)
+                arr[k] = arr[k0] * (1 - r) + arr[k1] * r
+        # 앞뒤 연장 (컷 경계 안에서). 컷 경계까지 EXTEND*2 이내면 경계까지 꽉 채움
+        first, last = ks[0], ks[-1]
+        pre = a if first - a <= EXTEND * 2 else first - EXTEND
+        post = b - 1 if (b - 1) - last <= EXTEND * 2 else last + EXTEND
+        for k in range(max(a, pre), first):
+            arr[k] = arr[first]
+        for k in range(last + 1, min(b, post + 1)):
+            arr[k] = arr[last]
+        # 위치 스무딩 (3프레임 이동평균)
+        keys = sorted(arr)
+        sm = {}
+        for j, k in enumerate(keys):
+            win = [arr[keys[m]] for m in range(max(0, j - 1), min(len(keys), j + 2)) if abs(keys[m] - k) <= 1]
+            sm[k] = np.mean(win, axis=0)
+        for k, v in sm.items():
+            out[k].append(v)
+    return out
+
+
+def blur_face(frame, d):
+    H, W = frame.shape[:2]
+    x, y, w, h = d[:4]
+    lm = d[4:14].reshape(5, 2)  # 오른눈, 왼눈, 코, 입 오른쪽, 입 왼쪽
+    eyes = (lm[0] + lm[1]) / 2
+    mouth = (lm[3] + lm[4]) / 2
+    # 타원 중심: 눈과 입 사이 약간 위 (이마 포함), 기울기: 두 눈 각도
+    cx, cy = (eyes[0] + mouth[0]) / 2, eyes[1] * 0.55 + mouth[1] * 0.45
+    if not (x <= cx <= x + w):
+        cx, cy = x + w / 2, y + h / 2
+    ang = np.degrees(np.arctan2(lm[1][1] - lm[0][1], lm[1][0] - lm[0][0]))
+    ax, ay = w * SCALE_W / 2, h * SCALE_H / 2
+    # 옆얼굴 보정: 두 눈 간격이 좁으면(고개 돌림) 타원을 넓히고 뒤통수 쪽으로 이동
+    turn = 1 - min(1.0, np.linalg.norm(lm[1] - lm[0]) / (w * 0.42 + 1e-6))
+    if turn > 0.15:
+        facing = np.sign(lm[2][0] - eyes[0]) or 1.0   # 코가 향한 방향
+        ax *= 1 + turn * 0.9
+        ay *= 1 + turn * 0.25
+        cx -= facing * w * 0.25 * turn
+        ang *= 1 - turn
+    r = int(max(ax, ay)) + 4
+    x0, y0, x1, y1 = int(max(0, cx - r)), int(max(0, cy - r)), int(min(W, cx + r)), int(min(H, cy + r))
+    if x1 - x0 < 6 or y1 - y0 < 6:
+        return
+    roi = frame[y0:y1, x0:x1]
+    small = cv2.resize(roi, (max(1, (x1 - x0) // 14), max(1, (y1 - y0) // 14)), interpolation=cv2.INTER_AREA)
+    pix = cv2.resize(small, (x1 - x0, y1 - y0), interpolation=cv2.INTER_NEAREST)
+    k = max(15, ((x1 - x0) // 5) | 1)
+    blurred = cv2.GaussianBlur(pix, (k, k), 0)
+    mask = np.zeros((y1 - y0, x1 - x0), np.uint8)
+    cv2.ellipse(mask, (int(cx - x0), int(cy - y0)), (int(ax), int(ay)), ang, 0, 360, 255, -1)
+    feather = max(5, int(min(ax, ay) * 0.12) | 1)
+    mask = cv2.GaussianBlur(mask, (feather, feather), 0)[..., None] / 255.0
+    frame[y0:y1, x0:x1] = (blurred * mask + roi * (1 - mask)).astype(np.uint8)
+
+
+def blur_video(inp, output, model, manual=None, skip=None, cuts=None, score=0.5, cache=None):
+    """skip: [(s,e)] 블러 제외 구간(초) / cuts: 컷 경계(초) 리스트 / manual: 수동 지정 박스."""
+    W, H, fps = probe(inp)
+    dets = detect_all(inp, model, W, H, score, cache)
+    n = len(dets)
+    skip = skip or []
+    for i in range(n):
+        if any(a <= i / fps < b for a, b in skip):
+            dets[i] = []
+    cut_frames = [int(round(c * fps)) for c in (cuts or [])]
+    per_frame = build_tracks(dets, cut_frames, n)
+
+    enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{W}x{H}",
+                            "-r", f"{fps}", "-i", "-", "-i", inp, "-map", "0:v", "-map", "1:a?",
+                            "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p",
+                            "-c:a", "copy", "-movflags", "+faststart", output], stdin=subprocess.PIPE)
+    for i, f in enumerate(frames(inp, W, H)):
+        if i < n:
+            for d in per_frame[i]:
+                blur_face(f, d)
+        for m in manual or []:
+            if m["start"] <= i / fps <= m["end"]:
+                x, y, w, h = m["box"]
+                blur_face(f, np.array([x, y, w / SCALE_W, h / SCALE_H] + [x + w / 2, y + h / 2] * 5))
+        enc.stdin.write(f.tobytes())
     enc.stdin.close()
     enc.wait()
-    dec.wait()
-    if args.log:
-        json.dump(log, open(args.log, "w"))
-    print(f"블러 완료: {args.output} ({i} frames)")
+    print(f"블러 완료: {output} ({n} frames)")
+    return per_frame
 
 
 def main():
@@ -125,12 +194,12 @@ def main():
     ap.add_argument("input")
     ap.add_argument("output")
     ap.add_argument("--model", required=True)
-    ap.add_argument("--manual")
+    ap.add_argument("--cuts", default="")
     ap.add_argument("--score", type=float, default=0.5)
-    ap.add_argument("--log")
+    ap.add_argument("--cache")
     a = ap.parse_args()
-    blur_video(a.input, a.output, a.model, json.load(open(a.manual)) if a.manual else None,
-               score=a.score, log_path=a.log)
+    cuts = [float(c) for c in a.cuts.split(",") if c]
+    blur_video(a.input, a.output, a.model, cuts=cuts, score=a.score, cache=a.cache)
 
 
 if __name__ == "__main__":
