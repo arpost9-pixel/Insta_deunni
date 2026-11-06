@@ -37,12 +37,17 @@ PRESETS = {
         "caption": "Pretendard Bold,50,&H00B469FF,&H00FFFFFF,&H50000000,-1,1,5,1.5,2,90,90,520",
         "caption_box": False,
     },
+    "box": {  # 흰 배경 사진에서도 잘 읽히는 반투명 검정 박스 자막
+        "caption": "Pretendard SemiBold,52,&H00FFFFFF,&H40000000,&H00000000,0,3,16,0,2,90,90,500",
+        "caption_box": True,
+    },
 }
 COMMON_STYLES = [
     # name, font, size, primary, outline, back, bold, borderstyle, outline, shadow, align, mL, mR, mV
     "HookTop,Pretendard Bold,50,&H00000000,&H0000E5FF,&H0000E5FF,-1,3,10,0,8,90,90,250",
     "HookMain,Pretendard Bold,72,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,3,14,0,8,90,90,330",
     "Emphasis,Pretendard Bold,120,&H00FFFFFF,&H00000000,&H64000000,-1,1,7,3,5,60,60,0",
+    "Label,Pretendard Bold,54,&H00FFFFFF,&H008C4BF0,&H008C4BF0,-1,3,14,0,8,90,90,250",
     "Ending,Pretendard Medium,76,&H00FFFFFF,&H00000000,&H78000000,0,1,0,4,8,60,60,330",
 ]
 
@@ -95,10 +100,13 @@ def build_ass(project, timeline, path):
     for (start, end, clip) in timeline:
         if clip.get("caption"):
             ev(start, end, "Caption", clip["caption"], "{\\fad(80,80)}")
+        if clip.get("label"):  # 상단 단계 라벨 (예: STEP 1. 얼리 임테기)
+            ev(start, end, "Label", f" {clip['label']} ", layer=1)
         if clip.get("emphasis"):
-            # 살짝 튀어나오는 팝 효과
+            # 살짝 튀어나오는 팝 효과 (emphasis_y 로 세로 위치 지정 가능)
+            pos = f"\\an5\\pos({W//2},{clip['emphasis_y']})" if clip.get("emphasis_y") else ""
             ev(start, end, "Emphasis", clip["emphasis"],
-               "{\\fscx70\\fscy70\\t(0,140,\\fscx108\\fscy108)\\t(140,240,\\fscx100\\fscy100)}", layer=2)
+               "{" + pos + "\\fscx70\\fscy70\\t(0,140,\\fscx108\\fscy108)\\t(140,240,\\fscx100\\fscy100)}", layer=2)
         if clip.get("ending"):
             ev(start + 0.3, end, "Ending", clip["ending"], "{\\fad(600,300)}", layer=2)
 
@@ -118,8 +126,18 @@ def render_clip(clip, base, out, preview):
     if is_img:
         frames = int(round(dur * FPS))
         zoom = clip.get("zoom", 0.06)  # 사진은 은은한 줌인(켄번즈)
-        vf = (f"scale={W*2}:{H*2}:force_original_aspect_ratio=increase,crop={W*2}:{H*2},"
-              f"zoompan=z='1+{zoom}*on/{max(frames,1)}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+        z0 = clip.get("z0", 1.0)  # 시작 배율 (클로즈업 컷)
+        fx, fy = clip.get("focus", [0.5, 0.5])  # 줌 중심(0~1)
+        if clip.get("fit"):  # 정사각형 캡처 등: 전체가 보이게 + 블러 배경
+            base_vf = (f"split[bg][fg];[bg]scale={W*2}:{H*2}:force_original_aspect_ratio=increase,"
+                       f"crop={W*2}:{H*2},boxblur=40:3,eq=brightness=-0.06[bgb];"
+                       f"[fg]scale={W*2}:{H*2}:force_original_aspect_ratio=decrease[fgs];"
+                       f"[bgb][fgs]overlay=(W-w)/2:(H-h)/2,")
+        else:
+            base_vf = f"scale={W*2}:{H*2}:force_original_aspect_ratio=increase,crop={W*2}:{H*2},"
+        vf = (base_vf +
+              f"zoompan=z='{z0}+{zoom}*on/{max(frames,1)}'"
+              f":x='max(0,min(iw-iw/zoom,iw*{fx}-iw/zoom/2))':y='max(0,min(ih-ih/zoom,ih*{fy}-ih/zoom/2))'"
               f":d={frames}:s={W}x{H}:fps={FPS},setsar=1")
         inp = ["-loop", "1", "-framerate", str(FPS), "-t", f"{dur}", "-i", src,
                "-f", "lavfi", "-t", f"{dur}", "-i", "anullsrc=r=48000:cl=stereo"]

@@ -52,3 +52,8 @@ python3 make_reel.py projects/sample/project.json --preview  # 빠른 확인
 - 사진 컷은 자동 제외(곰 캔들 오검출 방지), 컷 단위 제외는 `"no_blur": true`
 - 놓친 구간 수동 지정: `"manual": [{"start": 12.0, "end": 13.5, "box": [x, y, w, h]}]` (1080x1920 기준, 블러 전 합본 타임라인 기준 초)
 - 필요 패키지: `pip install opencv-python-headless numpy` / 모델: OpenCV Zoo YuNet (MIT)
+
+## 6. 프로젝트: 임테기 순서 (`projects/test_order`)
+- 결과물: `projects/test_order/test_order_reel.mp4` (46.4초, 무음 — 인스타 앱 내 음원 추가 권장)
+- 구조: 후킹("임테기도 순서가 있다고?!") → STEP 1 얼리 → STEP 2 원포 → 역전 → STEP 3 파이널 → 감성 엔딩
+- 신규 옵션: `style: "box"`(반투명 박스 자막), 컷별 `label`(상단 STEP 라벨), `fit`(블러 배경으로 전체 표시), `z0`/`focus`(클로즈업 시작 배율·줌 중심), `emphasis_y`(강조 문구 세로 위치)

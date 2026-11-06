@@ -1,0 +1,55 @@
+{
+  "title": "임테기 순서 (얼리 → 원포 → 파이널)",
+  "style": "box",
+  "output": "test_order_reel.mp4",
+  "hook": {
+    "top": "얼리 → 원포 → 파이널",
+    "main": "임테기도 순서가 있다고?!",
+    "start": 0,
+    "end": 2.8
+  },
+  "bgm": null,
+  "clips": [
+    {"src": "media/01_early.jpg", "dur": 2.8, "zoom": 0.05},
+    {"src": "media/01_early.jpg", "dur": 3.2, "z0": 1.05, "zoom": 0.05,
+     "caption": "어느 날 저녁, 처음 느껴보는\n미세한 어지러움과 얹힌 듯한 느낌"},
+    {"src": "media/01_early.jpg", "dur": 3.0, "z0": 1.1, "zoom": 0.05,
+     "label": "STEP 1. 얼리 임테기",
+     "caption": "적은 호르몬 수치로도\n임신 여부를 확인할 수 있어요"},
+    {"src": "media/01_early.jpg", "dur": 2.4, "z0": 1.8, "zoom": 0.25, "focus": [0.49, 0.34],
+     "emphasis": "어라? 두 줄?!", "emphasis_y": 1450},
+
+    {"src": "media/02_onestep.jpg", "dur": 3.0, "zoom": 0.04,
+     "label": "STEP 2. 원포 임테기",
+     "caption": "얼리는 바로 졸업!\n원포 임테기로 넘어가요"},
+    {"src": "media/02_onestep.jpg", "dur": 3.2, "z0": 1.04, "zoom": 0.04,
+     "label": "STEP 2. 원포 임테기",
+     "caption": "소변검사처럼 얇은 스트립이라\n가격도 상대적으로 저렴해요"},
+    {"src": "media/02_onestep.jpg", "dur": 3.0, "z0": 1.08, "zoom": 0.04,
+     "label": "STEP 2. 원포 임테기",
+     "caption": "당일 쿠팡 주문 → 다음 날 해보니\n역시나 두 줄"},
+    {"src": "media/02_onestep.jpg", "dur": 3.2, "z0": 1.12, "zoom": 0.05, "focus": [0.5, 0.45],
+     "label": "STEP 2. 원포 임테기",
+     "caption": "격일로 하면서 첫 번째 줄이\n진해지는 흐름을 체크해요"},
+    {"src": "media/03_reverse.jpg", "dur": 3.4, "fit": true, "zoom": 0.06,
+     "emphasis": "역전!", "emphasis_y": 300,
+     "caption": "10일쯤 지나 5주 2일 차,\n드디어 역전을 경험했어요"},
+
+    {"src": "media/04_final.jpg", "dur": 3.0, "zoom": 0.05,
+     "label": "STEP 3. 파이널 임테기",
+     "caption": "역전했다면 이제\n파이널(쓰리라인) 임테기로!"},
+    {"src": "media/04_final.jpg", "dur": 3.6, "z0": 1.05, "zoom": 0.05,
+     "label": "STEP 3. 파이널 임테기",
+     "caption": "공식 기준은 아니지만 아기집·난황·심장소리\n시기를 가늠하는 용도로 많이 써요"},
+    {"src": "media/04_final.jpg", "dur": 3.0, "z0": 1.5, "zoom": 0.15, "focus": [0.22, 0.41],
+     "label": "STEP 3. 파이널 임테기",
+     "caption": "격일로 하다가 첫 번째 줄까지\n역전되는 순간!"},
+    {"src": "media/04_final.jpg", "dur": 2.6, "z0": 1.65, "zoom": 0.08, "focus": [0.22, 0.41],
+     "emphasis": "임테기 지옥\n탈출!", "emphasis_y": 1350},
+
+    {"src": "media/01_early.jpg", "dur": 3.4, "z0": 1.0, "zoom": 0.05,
+     "caption": "오늘 선이 연해지면 어떡하지…\n매번 긴장되는 임신 초기지만"},
+    {"src": "media/01_early.jpg", "dur": 3.6, "z0": 1.05, "zoom": 0.06,
+     "ending": "이것마저도\n추억이랍니다"}
+  ]
+}
