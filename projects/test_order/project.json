@@ -34,17 +34,13 @@
    ]
   },
   {
-   "src": "media/01_early.jpg",
+   "src": "media/pkg_early.jpg",
    "dur": 3.0,
-   "z0": 1.4,
-   "zoom": 0.05,
+   "zoom": 0.06,
    "label": "STEP 1. 얼리 임테기",
    "caption": "적은 호르몬 수치로도\n임신 여부를 확인할 수 있어요",
    "narration": "가장 먼저 하는 건 얼리 임테기. 적은 호르몬 수치로도 확인할 수 있어요.",
-   "focus": [
-    0.45,
-    0.45
-   ]
+   "fit": true
   },
   {
    "src": "media/01_early.jpg",
@@ -67,21 +63,27 @@
    ]
   },
   {
-   "src": "media/02_onestep.jpg",
+   "src": "media/pkg_onestep.jpg",
    "dur": 3.0,
-   "zoom": 0.04,
+   "zoom": 0.06,
    "label": "STEP 2. 원포 임테기",
    "caption": "얼리는 바로 졸업!\n원포 임테기로 넘어가요",
-   "narration": "그때부터 얼리는 졸업! 원포 임테기로 넘어가요."
+   "narration": "그때부터 얼리는 졸업! 원포 임테기로 넘어가요.",
+   "fit": true
   },
   {
-   "src": "media/02_onestep.jpg",
+   "src": "media/pkg_onestep.jpg",
    "dur": 3.2,
-   "z0": 1.04,
-   "zoom": 0.04,
+   "zoom": 0.08,
    "label": "STEP 2. 원포 임테기",
    "caption": "얇은 종이 스트립이라\n가격도 상대적으로 저렴해요",
-   "narration": "얇은 종이 스트립이라 가격도 저렴해요."
+   "narration": "얇은 종이 스트립이라 가격도 저렴해요.",
+   "fit": true,
+   "z0": 1.35,
+   "focus": [
+    0.88,
+    0.5
+   ]
   },
   {
    "src": "media/02_onestep.jpg",
@@ -130,12 +132,14 @@
    "caption_y": 350
   },
   {
-   "src": "media/04_final.jpg",
+   "src": "media/pkg_final.jpg",
    "dur": 3.0,
-   "zoom": 0.05,
+   "zoom": 0.06,
    "label": "STEP 3. 파이널 임테기",
    "caption": "역전했다면 이제\n파이널(쓰리라인) 임테기로!",
-   "narration": "역전했다면 이제 파이널, 쓰리라인 임테기로 넘어가요."
+   "narration": "역전했다면 이제 파이널, 쓰리라인 임테기로 넘어가요.",
+   "fit": true,
+   "z0": 1.15
   },
   {
    "src": "media/04_final.jpg",
