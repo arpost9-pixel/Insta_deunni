@@ -54,6 +54,8 @@ python3 make_reel.py projects/sample/project.json --preview  # 빠른 확인
 - 필요 패키지: `pip install opencv-python-headless numpy` / 모델: OpenCV Zoo YuNet (MIT)
 
 ## 6. 프로젝트: 임테기 순서 (`projects/test_order`)
-- 결과물: `projects/test_order/test_order_reel.mp4` (46.4초, 무음 — 인스타 앱 내 음원 추가 권장)
+- 결과물: `projects/test_order/test_order_reel.mp4` (55.8초, 여성 AI 나레이션 포함 — BGM은 인스타 앱 내 음원 추가 권장)
 - 구조: 후킹("임테기도 순서가 있다고?!") → STEP 1 얼리 → STEP 2 원포 → 역전 → STEP 3 파이널 → 감성 엔딩
 - 신규 옵션: `style: "box"`(반투명 박스 자막), 컷별 `label`(상단 STEP 라벨), `fit`(블러 배경으로 전체 표시), `z0`/`focus`(클로즈업 시작 배율·줌 중심), `emphasis_y`(강조 문구 세로 위치)
+- (업데이트) 나레이션: project.json `narration`(voice/rate) + 컷별 `narration` 문구 → edge-tts(`ko-KR-SunHiNeural`)로 생성, 앞뒤 무음 제거 후 컷 길이를 낭독 길이에 자동 맞춤. 생성 파일은 `narration/`에 캐시 (`pip install edge-tts`)
+- (업데이트) 컷별 `arrows: [{"x":, "y":, "delay":}]` — 원본 사진 픽셀 좌표(화살표 촉 위치)를 주면 줌을 따라가는 노란 바운스 화살표 표시. `caption_y`로 자막 위치 개별 지정

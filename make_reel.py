@@ -70,6 +70,47 @@ def build_style_line(spec):
             f"{'6' if name == 'Ending' else '0'},0,{bs},{ol},{sh},{al},{ml},{mr},{mv},1")
 
 
+def src_to_out(clip, x, y, t, dur):
+    """원본 사진 좌표(x, y) → 컷 내 t초 시점의 출력 화면 좌표 (scale/crop·fit + zoompan 반영)."""
+    from PIL import Image
+    iw, ih = clip["_size"]
+    CW, CH = W * 2, H * 2
+    if clip.get("fit"):
+        sc = min(CW / iw, CH / ih)
+    else:
+        sc = max(CW / iw, CH / ih)
+    cx, cy = x * sc + (CW - iw * sc) / 2, y * sc + (CH - ih * sc) / 2
+    frames = max(int(round(dur * FPS)), 1)
+    on = min(t * FPS, frames)
+    z = clip.get("z0", 1.0) + clip.get("zoom", 0.06) * on / frames
+    fx, fy = clip.get("focus", [0.5, 0.5])
+    xo = max(0, min(CW - CW / z, CW * fx - CW / z / 2))
+    yo = max(0, min(CH - CH / z, CH * fy - CH / z / 2))
+    return (cx - xo) * z / 2, (cy - yo) * z / 2
+
+
+# 아래 방향 화살표 (bbox 0,0 ~ 90,160 / 촉 끝 = 45,160)
+ARROW_SHAPE = "m 30 0 l 60 0 l 60 95 l 90 95 l 45 160 l 0 95 l 30 95"
+
+
+def add_arrow(lines, start, end, clip, ar):
+    """컷 줌을 따라가며 위아래로 통통 튀는 화살표. ar = {"x":, "y":} (원본 사진 픽셀, 화살표 촉 위치)"""
+    import math
+    dur = end - start
+    t0 = ar.get("delay", 0.0)
+    step = 1 / FPS
+    n = int((dur - t0) / step)
+    for i in range(n):
+        t = t0 + i * step
+        px, py = src_to_out(clip, ar["x"], ar["y"], t, dur)
+        bob = 18 * abs(math.sin(math.pi * 2.2 * (t - t0)))
+        alpha = max(0, int(255 * (1 - (t - t0) / 0.15))) if t - t0 < 0.15 else 0
+        tag = (f"{{\\an7\\pos({px - 45:.1f},{py - 160 - 12 - bob:.1f})\\bord5\\shad0"
+               f"\\1c&H0000E5FF&\\3c&H00000000&\\alpha&H{alpha:02X}&\\p1}}")
+        lines.append(f"Dialogue: 3,{ass_time(start + t)},{ass_time(start + t + step)},Caption,,0,0,0,,"
+                     f"{tag}{ARROW_SHAPE}{{\\p0}}")
+
+
 def build_ass(project, timeline, path):
     preset = PRESETS[project.get("style", "vlog")]
     styles = [build_style_line("Caption," + preset["caption"])] + [build_style_line(s) for s in COMMON_STYLES]
@@ -99,7 +140,8 @@ def build_ass(project, timeline, path):
 
     for (start, end, clip) in timeline:
         if clip.get("caption"):
-            ev(start, end, "Caption", clip["caption"], "{\\fad(80,80)}")
+            cpos = f"\\an8\\pos({W//2},{clip['caption_y']})" if clip.get("caption_y") else ""  # 상단 기준 위치
+            ev(start, end, "Caption", clip["caption"], "{" + cpos + "\\fad(80,80)}")
         if clip.get("label"):  # 상단 단계 라벨 (예: STEP 1. 얼리 임테기)
             ev(start, end, "Label", f" {clip['label']} ", layer=1)
         if clip.get("emphasis"):
@@ -109,6 +151,9 @@ def build_ass(project, timeline, path):
                "{" + pos + "\\fscx70\\fscy70\\t(0,140,\\fscx108\\fscy108)\\t(140,240,\\fscx100\\fscy100)}", layer=2)
         if clip.get("ending"):
             ev(start + 0.3, end, "Ending", clip["ending"], "{\\fad(600,300)}", layer=2)
+
+        for ar in clip.get("arrows", []):
+            add_arrow(lines, start, end, clip, ar)
 
     for extra in project.get("texts", []):  # 컷과 무관한 자유 텍스트
         ev(extra["start"], extra.get("end", total), extra.get("style", "Caption"), extra["text"])
@@ -165,6 +210,52 @@ def render_clip(clip, base, out, preview):
     subprocess.run(cmd, check=True)
 
 
+def synth_narration(project, base):
+    """clips[].narration 을 TTS(edge-tts) 로 생성(캐시)하고, 컷 길이를 낭독 길이에 맞춘다."""
+    cfg = project.get("narration")
+    if not cfg:
+        return
+    import hashlib
+    voice, rate = cfg.get("voice", "ko-KR-SunHiNeural"), cfg.get("rate", "+0%")
+    pitch = cfg.get("pitch", "+0Hz")
+    pad = cfg.get("pad", 0.35)
+    ndir = os.path.join(base, "narration")
+    os.makedirs(ndir, exist_ok=True)
+    todo = []
+    for i, c in enumerate(project["clips"]):
+        if not c.get("narration"):
+            continue
+        key = hashlib.md5(f"{voice}|{rate}|{pitch}|{c['narration']}".encode()).hexdigest()[:10]
+        c["_nar"] = os.path.join(ndir, f"{i:02d}_{key}.mp3")
+        if not os.path.exists(c["_nar"]):
+            todo.append(c)
+    if todo:
+        import asyncio, ssl
+        import edge_tts, edge_tts.communicate as ecm
+        ca = os.environ.get("SSL_CERT_FILE") or "/root/.ccr/ca-bundle.crt"
+        if os.path.exists(ca):  # 프록시 환경 CA
+            ecm._SSL_CTX = ssl.create_default_context(cafile=ca)
+
+        async def run():
+            for c in todo:
+                print("  TTS:", c["narration"])
+                raw = c["_nar"] + ".raw.mp3"
+                await edge_tts.Communicate(c["narration"], voice, rate=rate, pitch=pitch).save(raw)
+                # 앞뒤 무음 제거
+                af = ("silenceremove=start_periods=1:start_threshold=-45dB,areverse,"
+                      "silenceremove=start_periods=1:start_threshold=-45dB,areverse")
+                subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-af", af, "-c:a", "libmp3lame",
+                                "-q:a", "2", c["_nar"]], check=True)
+                os.remove(raw)
+        asyncio.run(run())
+    for c in project["clips"]:
+        if c.get("_nar"):
+            ln = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                       "-of", "csv=p=0", c["_nar"]], capture_output=True, text=True).stdout)
+            c["_nar_len"] = ln
+            c["dur"] = round(max(float(c["dur"]), ln + c.get("nar_delay", 0.1) + pad), 2)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("project")
@@ -178,6 +269,12 @@ def main():
         project = json.load(f)
     base = os.path.dirname(os.path.abspath(args.project))
     out = args.output or os.path.join(base, project.get("output", "reel.mp4"))
+
+    synth_narration(project, base)
+    from PIL import Image
+    for c in project["clips"]:
+        if os.path.splitext(c["src"])[1].lower() in IMG_EXT:
+            c["_size"] = Image.open(os.path.join(base, c["src"])).size
 
     tmp = tempfile.mkdtemp(prefix="reel_")
     try:
@@ -233,6 +330,22 @@ def main():
         else:
             audio_in = []
             fa = "[0:a]loudnorm=I=-16:TP=-1.5[a]"
+        # 나레이션: 각 컷 시작 + nar_delay 위치에 배치 후 합성
+        nars = [(st + c.get("nar_delay", 0.1), c["_nar"]) for (st, en, c) in timeline if c.get("_nar")]
+        if nars:
+            ncfg = project["narration"]
+            k0 = 1 + (1 if bgm else 0)
+            for _, f_ in nars:
+                audio_in += ["-i", f_]
+            parts_a = "".join(f"[{k0+j}:a]aresample=48000,aformat=channel_layouts=stereo,"
+                              f"adelay={int(d*1000)}:all=1,volume={ncfg.get('volume', 1.0)}[n{j}];"
+                              for j, (d, _) in enumerate(nars))
+            nmix = "".join(f"[n{j}]" for j in range(len(nars)))
+            duck = ncfg.get("bgm_duck", 0.35) if bgm else 1.0
+            fa = fa.replace("[1:a]volume=" + str(bgm.get("volume", 0.5)) if bgm else "@@",
+                            f"[1:a]volume={bgm.get('volume', 0.5) * duck}" if bgm else "@@")
+            fa = fa.replace(",loudnorm=I=-16:TP=-1.5[a]", "[pre];").replace("[0:a]loudnorm=I=-16:TP=-1.5[a]", "[0:a]anull[pre];")
+            fa += parts_a + f"[pre]{nmix}amix=inputs={len(nars)+1}:duration=first:normalize=0,loudnorm=I=-16:TP=-1.5[a]"
         amap = ["-map", "[v]", "-map", "[a]", "-c:a", "aac", "-b:a", "192k", "-ar", "48000"]
 
         fa = f"[0:v]ass='{ass}':fontsdir='{FONT_DIR}'[v];" + fa
