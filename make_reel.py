@@ -150,7 +150,9 @@ def build_ass(project, timeline, path):
             ev(start, end, "Emphasis", clip["emphasis"],
                "{" + pos + "\\fscx70\\fscy70\\t(0,140,\\fscx108\\fscy108)\\t(140,240,\\fscx100\\fscy100)}", layer=2)
         if clip.get("ending"):
-            ev(start + 0.3, end, "Ending", clip["ending"], "{\\fad(600,300)}", layer=2)
+            # box 스타일(밝은 배경용)에서는 엔딩 문구에 외곽선 추가
+            etag = "\\bord4\\3c&H00000000&" if preset.get("caption_box") else ""
+            ev(start + 0.3, end, "Ending", clip["ending"], "{" + etag + "\\fad(600,300)}", layer=2)
 
         for ar in clip.get("arrows", []):
             add_arrow(lines, start, end, clip, ar)
